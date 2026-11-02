@@ -74,16 +74,20 @@ python3 <skill-dir>/scripts/dsh_session.py send hub "【构建完成】编译通
 
 之后：hub 会话收到一条用户消息 → 起一个 turn → 我的回复由 qqbot 插件推给 QQ 用户。
 
-**硬前提：hub 会话在 qqbot 插件里还活着。** 插件默认 `sessionIdleTimeout = 30 min`，闲置超时后
-会把记录回收；此后再往 hub 投消息，turn 照样会跑、日志照样写，但插件的
-`findBySessionId()` 找不到记录 → **不会推送到 QQ**（等用户下次在 QQ 说话时才被 resume，届时
-这段内容会作为历史出现在上下文里）。所以：
+**硬前提：这条回复必须落在 QQ 的「被动回复窗口」内。** 两个各自独立的失败模式，症状都是
+"日志里明明回复了，手机上没收到"：
 
-- hub 侧 30 分钟内有过 QQ 消息 → 通知可靠；
-- 超过 30 分钟没人在 QQ 说话 → 通知大概率只落在日志里。要可靠就等用户开口后立刻发，
-  或者把 hub 的 `sessionIdleTimeout` 调大（`$DSH_PROFILE_DIR/cordis.patch.yml` 的 `im-qqbot` 段）。
-- 判断办法：`send hub` 后在自己的 `tail` 里看到这条消息、再等一个 turn 结束；如果 QQ 没响，
-  先怀疑就是被回收了，别去改 RPC 代码。
+| 失败模式 | 触发条件 | 症状 |
+|---|---|---|
+| **被动回复窗口过期**（最常见） | 插件只用 inbound 消息的 `msg_id` 做被动回复，而 QQ 规定 `msg_id` **5 分钟**有效、同一 `msg_id` 最多回 5 条。由 RPC 注入 / GUI 触发的 turn 带的是上一条 QQ 消息的旧 `msg_id`，平台直接拒收 | 插件 `send()` 里只 `logger.error`，用户侧完全静默 |
+| **闲置回收** | `sessionIdleTimeout` 默认 30 min，超时后插件把该 peer 的记录删掉，`findBySessionId()` 返回 undefined，连 `replyTarget` 都没有 | 同上，且重发也没用 |
+
+判断与处置：
+
+- 先在 `tail` 里确认回复确实生成了，再看插件日志有没有 `passive reply rejected` / `sendMarkdown failed`；
+- 想可靠地推到手机：**先让用户在 QQ 里发一个字**（激活 5 分钟窗口），再 `send hub`，60 秒内必达；
+- 本部署给插件打过补丁（`dist/transport/send-fallback.js`）：被动被拒后自动降级成**主动消息**（去掉 `msgId` 重发，markdown 不行再退回纯文本）。主动消息有平台配额，配额耗尽仍会失败，但日志里三个通道的错误都会打出来，不再静默；
+- 纯通知类场景别指望"半夜也推到手机"，把重要结论同时写进会话/文件。
 
 跨会话投递是**单向、无回执**的：`accepted:true` 只说明进了 inbox。要求确认就再发一条。
 
