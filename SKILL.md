@@ -91,6 +91,30 @@ python3 <skill-dir>/scripts/dsh_session.py send hub "【构建完成】编译通
 
 跨会话投递是**单向、无回执**的：`accepted:true` 只说明进了 inbox。要求确认就再发一条。
 
+## 主动推送：`qqbot_send_text`
+
+本部署给插件打过补丁，多了一个 `qqbot_send_text` 工具（注册在 qqbot 插件里，同一宿主的所有会话都能用）。
+它和"普通回复"的区别只在于 target：
+
+```text
+qqbot_send_text(text="【构建完成】…", target="c2c:<openid>")     # 主动消息
+qqbot_send_text(text="【构建完成】…", target="group:<group_openid>")
+qqbot_send_text(text="…")                                        # 省略 target → 当前会话的 replyTarget
+```
+
+- **显式 target = 主动消息**：不带 `msg_id`，**不受 5 分钟被动回复窗口限制**，也不要求用户刚在 QQ 说过话。半夜推通知就用这个。
+- **openid 从哪来**：`~/.dsh-qqbot/model-prefs.json` 的 `sessionIds` key 形如 `qqbot:<appId>:c2c:<openid>`，取最后一段。需要时现读，别抄进文档或消息里。
+- **失败链**：被动 markdown → 主动 markdown → 主动纯文本；三条都失败才抛错，日志里三路原因都会打出来。
+- **返回**：`{target, chunks, sent, proactive}`；`sent == chunks` 只代表平台收单，不代表用户已读。openid 会被掩码成 `c2c:***1234`。
+- **限制**：主动消息有平台配额，额度耗尽只能等；群聊用 `group:`，注意群里的主动消息限制更严。
+
+**所以通知类场景有两条路**：
+
+| 场景 | 用什么 |
+|---|---|
+| 对端会话和 hub 在同一宿主（都是 `dsh web` 里的会话） | 直接调 `qqbot_send_text` 带 target，绕过 hub，最快 |
+| 不确定宿主 / 想让人过一遍 | `send hub "…"`，由 hub 决定要不要主动推 |
+
 ## 这些值从哪来（本 skill 不记录任何实际值）
 
 本 skill 里不放 token、session id、openid、摘要之类的真实值，一律现取：
