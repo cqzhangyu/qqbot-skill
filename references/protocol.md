@@ -149,8 +149,10 @@ grep -n "'session/prompt'" -A 12 "$DSH_NM"/@*/dsh-api-session-controller/lib/typ
   | `dist/media/send-text-tool.js` | 新增 `qqbot_send_text` 工具：显式 target → 主动消息（无 msg_id） |
   | `dist/gateway/bootstrap.js` | 注册该工具 |
 
-  启动脚本里对应的幂等函数是 `patch_qqbot_proactive` / `patch_qqbot_send_text`，跑
-  `--patch-only` 即可补齐；脚本末尾还会对补丁文件做一次 `node --check`。
+  启动脚本（`scripts/dsh-web-start.sh`）里对应的幂等函数是 `patch_qqbot_proactive` /
+  `patch_qqbot_send_text`，跑 `--patch-only` 即可补齐；脚本末尾还会对补丁文件做一次
+  `node --check`。`dsh-web-start.sh` 只做三件事：环境代理、`ws` 补丁、qqbot 补丁，
+  不写任何凭据；`QQBOT_PKG` / `DSH_NPM_PKG` 可用环境变量覆盖。
 
 - 出口：`dist/transport/outbound.js` 的 `route(session, raw)` 按 `session.header.id` 找
   `manager.findBySessionId()`，命中就把 `assistant/chunk`、`assistant/message`、`turn/end`

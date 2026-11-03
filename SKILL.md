@@ -167,6 +167,10 @@ qqbot_send_text(text="…")                                        # 省略 targ
 
 ## 参考
 
+- `scripts/dsh-web-start.sh`：启动 `dsh web` 并做幂等修补（`--patch-only` 只打补丁、不启动）。
+  它负责三件事：`NODE_USE_ENV_PROXY` 让 Node 走代理、给 `ws` 打代理补丁（否则 QQ 网关连不上）、
+  给 qqbot 插件补上主动消息降级与 `qqbot_send_text`；跑完会对补丁文件做 `node --check`。
+  工作目录用 `WORKSPACE` 覆盖，包名用 `DSH_NPM_PKG` / `QQBOT_PKG` 覆盖。
 - `references/protocol.md`：/api 的线格式、`session/prompt` 字段、错误码、token/cookie 机制、
   单写租约与 headless 接管失败的原因、会话文件布局。
 - 现成实现可对照：`$DSH_PROFILE_DIR/node_modules/@*/dsh-qqbot`
